@@ -257,7 +257,7 @@ sub merge( $ )
 			$j = $2;
 
 			push @attributex, $i;
-			push @attribute, sprintf( "D%0.2i*", $k + 10 ); 
+			push @attribute, sprintf( "D%i*", $k + 10 ); 
 			printf OUT "%%ADD%0.2i%s\n", $k + 10, $j;
 			$k++;
 			$a = <INX>;
@@ -276,7 +276,7 @@ sub merge( $ )
 			$i = "D" . $1 . "*";
 			$j = $2;
 			push @attributey, $i;
-			push @attribute, sprintf( "D%0.2i*", $k + 10 ); 
+			push @attribute, sprintf( "D%i*", $k + 10 ); 
 			printf OUT "%%ADD%0.2i%s\n", $k + 10, $j;
 			$k++;
 			$b = <INY>;
