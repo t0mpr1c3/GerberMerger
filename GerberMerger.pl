@@ -141,7 +141,7 @@ for ( $i = 0; $i < @diameter; $i++ )
 	}
 	if ( !$diameterx{ $a } && $diametery{ $b } )
 	{
-		$xynext++;
+		$ynext++;
 	}
 	if ( $xnext )
 	{
@@ -197,7 +197,12 @@ for ( $i = 0; $i < @diameter; $i++ )
 		while ( $next );
 	}
 }
-die if ( $a ne $b );
+if ( $a ne $b )
+{
+	print "$a\n";
+	print "$b\n";
+	die;
+};
 print OUT $a . "\n";
 #
 # end
