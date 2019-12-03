@@ -1,3 +1,4 @@
+#!/usr/bin/perl
 # Notes on merging Gerbers
 #
 # Perl script to merge FusionPCB gerbers
@@ -35,134 +36,12 @@ elsif (-e "$x.TXT" && !-e "$y.TXT")
 elsif (!-e "$x.TXT" && -e "$y.TXT")
 {
   print STDERR "Warning: can't find drill file $x.TXT\n";
-  open( INY, "$y.TXT" ) or die "Can't open file $y.TXT for input";
-  open( OUT, ">$z.TXT" ) or die "Can't open file $z.TXT for output";
-  #
-  # get header
-  #
-  # get initial %
-  $i = 0;
-  $next = 1;
-  do
-  { 
-    $i++; 
-    $_ = <INY>; 
-    $next = !( /%/ ); 
-  }
-  while ( $_ && $next );
-  print OUT "%\n";
-  #
-  # get header rows
-  $next = 1;
-  do
-  {
-    $b = <INY>;
-    if ( $b =~ /^T/ )
-    {
-      $next = 0;
-    } else
-    {
-      print OUT $b;
-    }
-  } while ( $b && $next );
-  #
-  # get drill diameters
-  %drill = ();
-  $next = 1;
-  %diametery = ();
-  do
-  {
-    if ( $b =~ /^T/ )
-    {
-      ( $i, $j ) = split( /C/, $b );
-      $diametery{ $i } = $j;
-      $drill{ $j }++;
-      $b = <INY>;
-    } else
-    {
-      $next = 0;
-    }
-  } while ( $b && $next );
-  #
-  # merge drill diameters
-  @diameter = sort keys %drill;
-  for ( $i = 0; $i < @diameter; $i++ )
-  {
-    $drill{ $diameter[ $i ] } = sprintf( "T%0.2i", $i + 1 ); 
-    print OUT $drill{ $diameter[ $i ] } . "C" . $diameter[ $i ];
-  }
-  print OUT "%\n";
-  #
-  # loop over drill diameters
-  $b = <INY>;
-  chomp $b;
-  if ( $b =~ /\r$/ )
-  {
-    chop $b; # remove CR
-  }
-  for ( $i = 0; $i < @diameter; $i++ )
-  {
-    print OUT $drill{ $diameter[ $i ] } . "\n";
-    #
-    # print drill locations from X with offsets
-    $next = 1;
-    ##print "Y\n";
-    ##print "$b\n";
-    ##print $diameterx{$b}."\n";
-    do
-    {
-      $b = <INY>;
-      if ( $b =~ /^X/ )
-      {
-        ( $dummy, $xloc, $yloc ) = split( /[XY]/, $b );
-        $xloc += $xoffset;
-        $yloc += $yoffset;
-        print OUT "X$xloc" . "Y$yloc" . "\n";
-      } else
-      {
-        chomp $b;
-        if ( $b =~ /\r$/ )
-        {
-          chop $b; # remove CR
-        }
-        $next = 0;
-      }
-    }
-    while ( $next );
-  }
-  print OUT $b . "\n";
-  #
-  # end
-  close( INY );
-  close( OUT );
+  system("cp $y.TXT $z.TXT") == 0 or die "Can't copy to file $z.TXT";
 } else
 {
   open( INX, "$x.TXT" ) or die "Can't open file $x.TXT for input";
   open( INY, "$y.TXT" ) or die "Can't open file $y.TXT for input";
   open( OUT, ">$z.TXT" ) or die "Can't open file $z.TXT for output";
-  #
-  # get header
-  #
-  # get initial %
-  $i = 0;
-  $next = 1;
-  do
-  { 
-    $i++; 
-    $_ = <INX>; 
-    $next = !( /%/ ); 
-  }
-  while ( $_ && $next );
-  $i = 0;
-  $next = 1;
-  do
-  { 
-    $i++; 
-    $_ = <INY>; 
-    $next = !( /%/ ); 
-  }
-  while ( $_ && $next );
-  print OUT "%\n";
   #
   # get header rows
   $next = 1;
@@ -170,7 +49,7 @@ elsif (!-e "$x.TXT" && -e "$y.TXT")
   {
     $a = <INX>;
     $b = <INY>;
-    if ( $a =~ /^T/ || $b =~ /^T/ )
+    if ( $a =~ /^T\d+C[0-9.]+/ || $b =~ /^T\d+C[0-9.]+/ )
     {
       $next = 0;
     } elsif ( $a ne $b )
@@ -184,15 +63,23 @@ elsif (!-e "$x.TXT" && -e "$y.TXT")
   #
   # get drill diameters
   %drill = ();
+  $k = 1;
+  %diameter = ();
   $next = 1;
   %diameterx = ();
+  %diametery = ();
   do
   {
-    if ( $a =~ /^T/ )
+    if ( $a =~ /^T(\d+)C([0-9.]+)/ )
     {
-      ( $i, $j ) = split( /C/, $a );
+      ( $i, $j ) = ( $1, $2 );
       $diameterx{ $i } = $j;
-      $drill{ $j }++;
+      if ( !exists( $drill{ $j } ) )
+      {
+        $diameter{ $k } = $j;
+        $drill{ $j } = $k;
+        $k++;
+      }
       $a = <INX>;
     } else
     {
@@ -200,71 +87,45 @@ elsif (!-e "$x.TXT" && -e "$y.TXT")
     }
   } while ( $a && $next );
   $next = 1;
-  %diametery = ();
   do
   {
-    if ( $b =~ /^T/ )
+    if ( $b =~ /^T(\d+)C([0-9.]+)/ )
     {
-      ( $i, $j ) = split( /C/, $b );
+      ( $i, $j ) = ( $1, $2 );
       $diametery{ $i } = $j;
-      $drill{ $j }++;
+      if ( !exists( $drill{ $j } ) )
+      {
+        $diameter{ $k } = $j;
+        $drill{ $j } = $k;
+        $k++;
+      }
       $b = <INY>;
     } else
     {
       $next = 0;
     }
   } while ( $b && $next );
-  #
-  # merge drill diameters
-  @diameter = sort keys %drill;
-  for ( $i = 0; $i < @diameter; $i++ )
+  for ( $i = 1; $i < $k; $i++ )
   {
-    $drill{ $diameter[ $i ] } = sprintf( "T%0.2i", $i + 1 ); 
-    print OUT $drill{ $diameter[ $i ] } . "C" . $diameter[ $i ];
+    print OUT "T" . $i . "C" . $diameter{ $i } . "\n";
   }
   print OUT "%\n";
   #
-  # loop over drill diameters
+  # loop over X drills
   $a = <INX>;
   chomp $a;
   if ( $a =~ /\r$/ )
   {
     chop $a; # remove CR
   }
-  $b = <INY>;
-  chomp $b;
-  if ( $b =~ /\r$/ )
+  while ( $a && $a !~ /^M/ )
   {
-    chop $b; # remove CR
-  }
-  for ( $i = 0; $i < @diameter; $i++ )
-  {
-    print OUT $drill{ $diameter[ $i ] } . "\n";
-    $xnext = 0;
-    $ynext = 0;
-    if ( $diameterx{ $a } && $diametery{ $b } && ( $diameterx{ $a } <= $diametery{ $b } ) )
+    if ( $a =~ /^T(\d+)/ )
     {
-      $xnext++;
-    }
-    if ( $diameterx{ $a } && $diametery{ $b } && ( $diameterx{ $a } >= $diametery{ $b } ) )
-    {
-      $ynext++;
-    }
-    if ( $diameterx{ $a } && !$diametery{ $b } )
-    {
-      $xnext++;
-    }
-    if ( !$diameterx{ $a } && $diametery{ $b } )
-    {
-      $ynext++;
-    }
-    if ( $xnext )
-    {
-      # print drill locations from X without offsets
+      $i = $1;
+      print OUT "T" . $drill{ $diameterx{ $i } } . "\n";
+      # print feature locations from X without offsets
       $next = 1;
-      ##print "X\n";
-      ##print "$a\n";
-      ##print $diameterx{$a}."\n";
       do
       {
         $a = <INX>;
@@ -282,23 +143,33 @@ elsif (!-e "$x.TXT" && -e "$y.TXT")
         }
       }
       while ( $next );
-    } 
-    if ( $ynext )
+    }
+  }
+  #
+  # loop over Y drills
+  $b = <INY>;
+  chomp $b;
+  if ( $b =~ /\r$/ )
+  {
+    chop $b; # remove CR
+  }
+  while ( $b && $b !~ /^M/ )
+  {
+    if ( $b =~ /^T(\d+)/ )
     {
-      # print drill locations from X with offsets
+      $i = $1;
+      print OUT "T" . $drill{ $diametery{ $i } } . "\n";
+      # print feature locations from Y with offsets
       $next = 1;
-      ##print "Y\n";
-      ##print "$b\n";
-      ##print $diameterx{$b}."\n";
       do
       {
         $b = <INY>;
         if ( $b =~ /^X/ )
         {
           ( $dummy, $xloc, $yloc ) = split( /[XY]/, $b );
-          $xloc += $xoffset;
-          $yloc += $yoffset;
-          print OUT "X$xloc" . "Y$yloc" . "\n";
+          $xloc += $xoffset / 10;
+          $yloc += $yoffset / 10;
+          print OUT "X$xloc" . "Y$yloc\n";
         } else
         {
           chomp $b;
@@ -312,12 +183,8 @@ elsif (!-e "$x.TXT" && -e "$y.TXT")
       while ( $next );
     }
   }
-  if ( $a ne $b )
-  {
-    print "$a\n";
-    print "$b\n";
-    die;
-  };
+  #
+  die if ( $a ne $b );
   print OUT $a . "\n";
   #
   # end
@@ -346,11 +213,15 @@ sub merge( $ )
   {
     $a = <INX>;
     $b = <INY>;
-    if ( $a =~ /^%ADD/ || $b =~ /^%ADD/ )
+    if ( $a =~ /^G01[*]/ && $b =~ /^G01[*]/ )
     {
+      print OUT "G01*\n";
       $next = 0;
     } elsif ( $a ne $b )
     { 
+      print "Error:\n";
+      print $a;
+      print $b;
       die ".$suffix file headers do not match";
     } else
     {
@@ -358,63 +229,156 @@ sub merge( $ )
     }
   } while ( $a && $b && $next );
   #
-  #
-  # get features
-  @attribute = ();
-  $k = 0;
+  # get apertures
+  %aperture = ();
+  %attribute = ();
+  $k = 10;
   $next = 1;
-  @attributex = ();
+  %aperturex = ();
   do
   {
-    if ( $a =~ /^%ADD/ )
+  	$a = <INX>;
+    if ( $a =~ /%ADD(\d+)C,(.*)/ )
     {
-      $a =~ /%ADD(\d+)(.*)/;
-      $i = "D" . $1 . "*";
+      $i = $1;
       $j = $2;
-
-      push @attributex, $i;
-      push @attribute, sprintf( "D%i*", $k + 10 ); 
-      printf OUT "%%ADD%0.2i%s\n", $k + 10, $j;
-      $k++;
-      $a = <INX>;
+      $aperturex{ $i } = $j;
+      if ( !exists( $attribute{ $j } ) )
+      {
+        $attribute{ $j } = $k;
+        $aperture{ $k } = $j;
+        $k++; 
+      }
     } else
     {
       $next = 0;
     }
   } while ( $a && $next );
   $next = 1;
-  @attributey = ();
+  %aperturey = ();
   do
   {
-    if ( $b =~ /^%ADD/ )
+  	$b = <INY>;
+    if ( $b =~ /%ADD(\d+)C,(.*)/ )
     {
-      $b =~ /%ADD(\d+)(.*)/;
-      $i = "D" . $1 . "*";
+      $i = $1;
       $j = $2;
-      push @attributey, $i;
-      push @attribute, sprintf( "D%i*", $k + 10 ); 
-      printf OUT "%%ADD%0.2i%s\n", $k + 10, $j;
-      $k++;
-      $b = <INY>;
+      $aperturey{ $i } = $j;
+      if ( !exists( $attribute{ $j } ) )
+      {
+        $attribute{ $j } = $k;
+        $aperture{ $k } = $j;
+        $k++; 
+      }
     } else
     {
       $next = 0;
     }
   } while ( $b && $next );
+  for ( $i = 10; $i < $k; $i++ )
+  {
+  	printf OUT "%%ADD%iC,%s\n", $i, $aperture{ $i };
+  }
   #
-  # loop over X feature attributes
+  # loop over X fill areas, if any
+  $fill = 0;
+  if ( $a eq "\n" )
+  {
+    $a = <INX>;
+  }
+  while ( $a =~ /^G36[*]/ )
+  {
+    $fill = 1;
+    print OUT "G36*\n";
+    # print fill locations from X without offsets
+    $next = 1;
+    do
+    {
+      $a = <INX>;
+      if ( $a =~ /^X/ )
+      {
+        print OUT $a;
+      } else
+      {
+        chomp $a;
+        if ( $a =~ /\r$/ )
+        {
+          chop $a; # remove CR
+        }
+        $next = 0;
+      }
+    }
+    while ( $next );
+    if ( $a !~ /^G37[*]/ )
+    {
+      die "Can't find G37* at end of G36* block\n";
+    }
+    $a = <INX>;
+  }
+  #
+  # loop over Y fill areas, if any
+  if ( $b eq "\n" )
+  {
+    $b = <INY>;
+  }
+  while ( $b =~ /^G36[*]/ )
+  {
+    if ( $fill == 0 )
+    {
+      print OUT "G36*\n";
+    }
+    $fill = 1;
+    # print fill locations from Y with offsets
+    $next = 1;
+    do
+    {
+      $b = <INY>;
+      if ( $b =~ /^X/ )
+      {
+        ( $dummy, $xloc, $yloc, $rest ) = split( /[XYD]/, $b );
+        $xloc += $xoffset;
+        $yloc += $yoffset;
+        print OUT "X$xloc" . "Y$yloc" . "D$rest";
+      } else
+      {
+        chomp $b;
+        if ( $b =~ /\r$/ )
+        {
+          chop $b; # remove CR
+        }
+        $next = 0;
+      }
+    }
+    while ( $next );
+    if ( $b !~ /^G37[*]/ )
+    {
+      die "Can't find G37* at end of G36* block\n";
+    }
+    $b = <INY>;
+  }
+  #
+  if ( $fill == 1 )
+  {
+    print OUT "G37*\n";
+  }
+  #
+  # loop over X apertures
   ##$a = <INX>;
+  if ( $a eq "\n" )
+  {
+    $a = <INX>;
+  }
   chomp $a;
   if ( $a =~ /\r$/ )
   {
     chop $a; # remove CR
   }
-  $k = 0;
-  for ( $i = 0; $i < @attributex; $i++, $k++ )
+  while ( $a && $a !~ /^M/ )
   {
-    print OUT $attribute[ $k ] . "\n";
-    if ( $attributex[ $i ] eq $a )
+    if ( $a =~ /^D(\d+)[*]/ )
     {
+      $i = $1;
+      print OUT "D" . $attribute{ $aperturex{ $i } } . "*\n";
       # print feature locations from X without offsets
       $next = 1;
       do
@@ -434,29 +398,26 @@ sub merge( $ )
         }
       }
       while ( $next );
-    } else
-    {
-      print "$a\n";
-      print "$i\n";
-      print $attributex[ $i ] . "\n";
-      print "$k\n";
-      print $attribute[ $k ] . "\n";
-      die;
     }
   }
   #
-  # loop over Y feature attributes
+  # loop over Y apertures
   ##$b = <INY>;
+  if ( $b eq "\n" )
+  {
+    $b = <INY>;
+  }
   chomp $b;
   if ( $b =~ /\r$/ )
   {
     chop $b; # remove CR
   }
-  for ( $i = 0; $i < @attributey; $i++, $k++ )
+  while ( $b && $b !~ /^M/ )
   {
-    print OUT $attribute[ $k ] . "\n";
-    if ( $attributey[ $i ] eq $b )
+    if ( $b =~ /^D(\d+)[*]/ )
     {
+      $i = $1;
+      print OUT "D" . $attribute{ $aperturey{ $i } } . "*\n";
       # print feature locations from Y with offsets
       $next = 1;
       do
@@ -479,18 +440,13 @@ sub merge( $ )
         }
       }
       while ( $next );
-    } else
-    {
-      print "$b\n";
-      print "$i\n";
-      print $attributey[ $i ] . "\n";
-      print "$k\n";
-      print $attribute[ $k ] . "\n";
-      die;
     }
   }
+  #
   die if ( $a ne $b );
   print OUT $a . "\n";
+  #
+  # end
   close( INX );
   close( INY );
   close( OUT );
@@ -500,7 +456,10 @@ sub merge( $ )
 merge( "GTL" );
 merge( "GTS" );
 merge( "GTO" );
+merge( "GTP" );
 merge( "GBL" );
 merge( "GBS" );
 merge( "GBO" );
+merge( "GBP" );
+merge( "GML" );
 
